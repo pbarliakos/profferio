@@ -74,6 +74,3 @@ const handleLogin = async (e) => {
 }
 
 export default Login;
-
-
-
