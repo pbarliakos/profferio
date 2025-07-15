@@ -15,7 +15,7 @@ function App() {
       <p>Role: {userData.role}</p>
       <p>Projects: {Array.isArray(userData.projects) ? userData.projects.join(", ") : "N/A"}</p>
 
-      {userData.role === "admin" && <AdminPanel />}
+      {userData.role?.toLowerCase() === "admin" && <AdminPanel />}
     </div>
   );
 }
