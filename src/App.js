@@ -4,6 +4,8 @@ import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import Login from "./pages/Login";
 import AdminPanel from "./pages/AdminPanel";
+import { signOut } from "firebase/auth";
+
 
 function App() {
   const [userData, setUserData] = useState(null);
@@ -38,12 +40,15 @@ function App() {
   return (
     <div>
       <h1>Welcome {userData.username}!</h1>
-      <p>Role: {userData.role}</p>
-      <p>Projects: {Array.isArray(userData.projects) ? userData.projects.join(", ") : "N/A"}</p>
+      <p>Role: {userData.role} Projects: {Array.isArray(userData.projects) ? userData.projects.join(", ") : "N/A"}</p>
 
+      <button style={{ position: "absolute", top: 10, right: 10 }} onClick={() => signOut(auth)}>
+      Logout 
+      </button>
       {userData.role?.toLowerCase() === "admin" && <AdminPanel />}
     </div>
   );
+  
 }
 
 export default App;
