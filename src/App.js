@@ -1,13 +1,39 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { auth, db } from "./firebaseConfig";
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 import Login from "./pages/Login";
 import AdminPanel from "./pages/AdminPanel";
 
 function App() {
   const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  if (!userData) {
-    return <Login onLogin={setUserData} />;
-  }
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          const docRef = doc(db, "users", user.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            setUserData(docSnap.data());
+          } else {
+            console.error("No user data found");
+          }
+        } catch (err) {
+          console.error("Error loading user data", err);
+        }
+      } else {
+        setUserData(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  if (loading) return <p>Loading...</p>;
+  if (!userData) return <Login onLogin={setUserData} />;
 
   return (
     <div>
