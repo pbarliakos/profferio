@@ -44,29 +44,7 @@ const handleLogin = async (e) => {
   } catch (err) {
     setError("Invalid credentials.");
     console.error("❌ Firebase login error:", err.code, err.message);
-  }
-
-
-
-
-
-  console.log("USERNAME:", username);
-
-const q = query(collection(db, "users"), where("username", "==", username));
-const snap = await getDocs(q);
-console.log("SNAP SIZE:", snap.size);
-
-if (snap.empty) {
-  setError("Username not found");
-  return;
-}
-
-const data = snap.docs[0].data();
-console.log("DATA FOUND:", data);
-
-
-
-  
+  }  
 };
 
 
