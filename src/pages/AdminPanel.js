@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { auth, db } from "../firebaseConfig";
 import {
   createUserWithEmailAndPassword,
-  updatePassword,
 } from "firebase/auth";
 import {
   collection, getDocs, setDoc, doc, deleteDoc, updateDoc
@@ -47,7 +46,6 @@ function AdminPanel() {
   const handleCreate = async (e) => {
     e.preventDefault();
     setMessage("");
-
     try {
       const cred = await createUserWithEmailAndPassword(auth, form.email, form.password);
       await setDoc(doc(db, "users", cred.user.uid), {
@@ -84,13 +82,18 @@ function AdminPanel() {
       projects: form.projects,
     });
 
-    // Σημείωση: αλλαγή password γίνεται μόνο αν έχει συμπληρωθεί
     if (form.password) {
       try {
-        const userRecord = await auth.getUserByEmail(form.email); // <-- Αυτό δεν δουλεύει στο client!
-        await updatePassword(userRecord, form.password);
+        await fetch("https://us-central1-profferio.cloudfunctions.net/updateUserPassword", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: form.email,
+            newPassword: form.password
+          }),
+        });
       } catch (err) {
-        console.warn("Cannot change password here. Needs Cloud Function.");
+        console.warn("❌ Password update failed", err);
       }
     }
 
@@ -99,10 +102,23 @@ function AdminPanel() {
     fetchUsers();
   };
 
-  const handleDelete = async (id) => {
-    await deleteDoc(doc(db, "users", id));
-    // ⚠️ Προσθήκη: Cloud Function για Auth delete
-    fetchUsers();
+  const handleDelete = async (user) => {
+    const confirmed = window.confirm(`Delete user ${user.email}?`);
+    if (!confirmed) return;
+
+    try {
+      await deleteDoc(doc(db, "users", user.id));
+      await fetch("https://us-central1-profferio.cloudfunctions.net/deleteUser", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email }),
+      });
+      fetchUsers();
+      setMessage("✅ User deleted.");
+    } catch (err) {
+      console.error("Delete failed", err);
+      setMessage("❌ Delete failed: " + err.message);
+    }
   };
 
   const filteredUsers = users.filter((u) =>
@@ -111,42 +127,42 @@ function AdminPanel() {
   );
 
   return (
-    <div>
-      <h2>Create User</h2>
-      <form onSubmit={handleCreate}>
-        <input name="username" placeholder="Username" value={form.username} onChange={handleChange} required /><br />
-        <input name="email" placeholder="Email" value={form.email} onChange={handleChange} required /><br />
-        <input name="password" placeholder="Password" type="password" value={form.password} onChange={handleChange} required /><br />
+    <div style={{ padding: "2rem", fontFamily: "sans-serif", maxWidth: "1000px", margin: "auto" }}>
+      <h2 style={{ fontSize: "1.5rem", fontWeight: "bold" }}>Create User</h2>
+      <form onSubmit={handleCreate} style={{ display: "grid", gap: "0.5rem", marginBottom: "2rem" }}>
+        <input name="username" placeholder="Username" value={form.username} onChange={handleChange} required />
+        <input name="email" placeholder="Email" value={form.email} onChange={handleChange} required />
+        <input name="password" type="password" placeholder="Password" value={form.password} onChange={handleChange} required />
         <select name="role" value={form.role} onChange={handleChange}>
           <option value="admin">Admin</option>
           <option value="manager">Manager</option>
           <option value="user">User</option>
-        </select><br />
+        </select>
         <select name="projects" multiple value={form.projects} onChange={handleChange}>
           <option value="alterlife">Alterlife</option>
           <option value="other">Other</option>
-        </select><br />
-        <button type="submit">Create User</button>
+        </select>
+        <button type="submit">Create</button>
         {message && <p>{message}</p>}
       </form>
 
-      <hr />
-      <h2>All Users</h2>
+      <h2 style={{ fontSize: "1.5rem", fontWeight: "bold" }}>Users</h2>
       <input
         type="text"
-        placeholder="Search users..."
+        placeholder="Search..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-      /><br /><br />
+        style={{ marginBottom: "1rem", padding: "0.5rem", width: "100%" }}
+      />
 
-      <table border="1" cellPadding="6">
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
         <thead>
-          <tr>
-            <th>Username</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th>Projects</th>
-            <th>Actions</th>
+          <tr style={{ backgroundColor: "#f0f0f0" }}>
+            <th style={{ padding: "8px", border: "1px solid #ccc" }}>Username</th>
+            <th style={{ padding: "8px", border: "1px solid #ccc" }}>Email</th>
+            <th style={{ padding: "8px", border: "1px solid #ccc" }}>Role</th>
+            <th style={{ padding: "8px", border: "1px solid #ccc" }}>Projects</th>
+            <th style={{ padding: "8px", border: "1px solid #ccc" }}>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -163,13 +179,13 @@ function AdminPanel() {
                   </select>
                 </td>
                 <td>
-                <select name="projects" multiple value={form.projects} onChange={handleChange}>
+                  <select name="projects" multiple value={form.projects} onChange={handleChange}>
                     <option value="alterlife">Alterlife</option>
                     <option value="other">Other</option>
-                </select>
+                  </select>
                 </td>
                 <td>
-                  <input name="password" type="password" placeholder="New password (optional)" value={form.password} onChange={handleChange} /><br />
+                  <input name="password" type="password" placeholder="New password" value={form.password} onChange={handleChange} />
                   <button onClick={handleUpdate}>Save</button>
                   <button onClick={() => setEditUserId(null)}>Cancel</button>
                 </td>
@@ -182,7 +198,7 @@ function AdminPanel() {
                 <td>{(user.projects || []).join(", ")}</td>
                 <td>
                   <button onClick={() => handleEdit(user)}>Edit</button>
-                  <button onClick={() => handleDelete(user.id)}>Delete</button>
+                  <button onClick={() => handleDelete(user)}>Delete</button>
                 </td>
               </tr>
             )
